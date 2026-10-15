@@ -12,15 +12,17 @@ from utils import BenchmarkResult, Timer, compute_recall, brute_force_knn, perce
 import config
 
 
-def create_adapter(db_type: str, collection_name: str, dim: int) -> BaseAdapter:
+def create_adapter(db_type: str, collection_name: str, dim: int, local_mode: bool = False) -> BaseAdapter:
     """根据类型创建对应的适配器"""
     if db_type == "milvus":
-        return MilvusAdapter(collection_name, dim)
+        return MilvusAdapter(collection_name, dim, local_mode=local_mode)
     elif db_type == "chroma":
-        return ChromaAdapter(collection_name, dim)
+        return ChromaAdapter(collection_name, dim, local_mode=local_mode)
     elif db_type == "qdrant":
-        return QdrantAdapter(collection_name, dim)
+        return QdrantAdapter(collection_name, dim, local_mode=local_mode)
     elif db_type == "pgvector":
+        if local_mode:
+            raise ValueError("pgvector 不支持本地模式，需要 PostgreSQL 服务")
         return PgvectorAdapter(collection_name, dim)
     else:
         raise ValueError(f"未知的数据库类型: {db_type}")
@@ -147,9 +149,16 @@ def run_single_test(
     db_type: str,
     dataset_name: str,
     dataset_config: dict,
+    local_mode: bool = False,
 ) -> BenchmarkResult:
     """
     对单个数据库 + 单个数据集执行完整测试
+
+    Args:
+        db_type: 数据库类型
+        dataset_name: 数据集名称
+        dataset_config: 数据集配置
+        local_mode: 是否使用本地模式
 
     Returns:
         BenchmarkResult
@@ -158,8 +167,9 @@ def run_single_test(
     num_vectors = dataset_config["num_vectors"]
     collection_name = f"{config.COLLECTION_PREFIX}{dataset_name}_{dim}d"
 
+    mode_str = "本地模式" if local_mode else "远程模式"
     print(f"\n{'='*60}")
-    print(f"测试: {db_type} | 数据集: {dataset_name}")
+    print(f"测试: {db_type} ({mode_str}) | 数据集: {dataset_name}")
     print(f"  向量数: {num_vectors:,}, 维度: {dim}")
     print(f"{'='*60}")
 
@@ -167,7 +177,7 @@ def run_single_test(
     base_vectors, query_vectors = generate_dataset(dataset_name, dataset_config)
 
     # 创建适配器
-    adapter = create_adapter(db_type, collection_name, dim)
+    adapter = create_adapter(db_type, collection_name, dim, local_mode=local_mode)
 
     try:
         # 连接
@@ -230,6 +240,7 @@ def run_single_test(
 def run_all_benchmarks(
     db_types: List[str] = None,
     dataset_names: List[str] = None,
+    local_mode: bool = False,
 ) -> List[BenchmarkResult]:
     """
     运行所有基准测试
@@ -237,12 +248,21 @@ def run_all_benchmarks(
     Args:
         db_types: 要测试的数据库列表，默认全部
         dataset_names: 要使用的数据集列表，默认使用 DEFAULT_DATASETS
+        local_mode: 是否使用本地模式（本地模式下 pgvector 不参与）
 
     Returns:
         所有测试结果的列表
     """
-    if db_types is None:
-        db_types = ["milvus", "chroma", "qdrant", "pgvector"]
+    if local_mode:
+        # 本地模式：只有 milvus/chroma/qdrant 支持
+        if db_types is None:
+            db_types = ["milvus", "chroma", "qdrant"]
+        else:
+            # 过滤掉不支持本地模式的数据库
+            db_types = [db for db in db_types if db in ("milvus", "chroma", "qdrant")]
+    else:
+        if db_types is None:
+            db_types = ["milvus", "chroma", "qdrant", "pgvector"]
 
     if dataset_names is None:
         dataset_names = config.DEFAULT_DATASETS
@@ -257,7 +277,7 @@ def run_all_benchmarks(
         dataset_config = config.DATASETS[dataset_name]
 
         for db_type in db_types:
-            result = run_single_test(db_type, dataset_name, dataset_config)
+            result = run_single_test(db_type, dataset_name, dataset_config, local_mode=local_mode)
             results.append(result)
 
     return results

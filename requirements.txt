@@ -1,5 +1,6 @@
 numpy>=1.24.0
 pymilvus>=2.4.0
+milvus-lite>=2.4.0
 chromadb>=0.5.0
 qdrant-client>=1.9.0
 psycopg[binary]>=3.1.0

@@ -2,13 +2,20 @@
 向量数据库性能基准测试 - 主入口
 
 支持的数据库: Milvus, Chroma, Qdrant, pgvector
+测试模式:
+  - 远程模式 (默认): 连接远程服务，全部 4 个数据库参与
+  - 本地模式 (--local): 嵌入式运行，仅 Milvus/Chroma/Qdrant 参与
+
 测试指标:
   - 写入: 吞吐量 (vectors/sec), 平均延迟, P99 延迟
   - 读取: 查询延迟 (avg/P99), QPS, Recall@K
 
 用法:
-  # 运行全部默认测试
+  # 远程模式 - 运行全部默认测试
   python main.py
+
+  # 本地模式 - 嵌入式运行 (无网络服务)
+  python main.py --local
 
   # 只测试特定数据库
   python main.py --dbs milvus qdrant
@@ -64,6 +71,11 @@ def main():
         help="运行所有数据集（包括大规模数据集）",
     )
     parser.add_argument(
+        "--local",
+        action="store_true",
+        help="本地模式: 嵌入式运行，无需远程服务 (仅 Milvus/Chroma/Qdrant)",
+    )
+    parser.add_argument(
         "--list-datasets",
         action="store_true",
         help="列出所有可用数据集",
@@ -90,11 +102,19 @@ def main():
         dataset_names = config.DEFAULT_DATASETS
 
     # 确定数据库
-    db_types = args.dbs or ["milvus", "chroma", "qdrant", "pgvector"]
+    local_mode = args.local
+    if local_mode:
+        db_types = args.dbs or ["milvus", "chroma", "qdrant"]
+        # 本地模式下过滤掉 pgvector
+        db_types = [db for db in db_types if db != "pgvector"]
+    else:
+        db_types = args.dbs or ["milvus", "chroma", "qdrant", "pgvector"]
 
+    mode_str = "本地模式" if local_mode else "远程模式"
     print("=" * 80)
     print("向量数据库性能基准测试")
     print("=" * 80)
+    print(f"  运行模式: {mode_str}")
     print(f"  数据库: {', '.join(db_types)}")
     print(f"  数据集: {', '.join(dataset_names)}")
     print(f"  写入批次大小: {config.WRITE_BATCH_SIZE}")
@@ -108,6 +128,7 @@ def main():
     results = run_all_benchmarks(
         db_types=db_types,
         dataset_names=dataset_names,
+        local_mode=local_mode,
     )
 
     elapsed = time.time() - start_time

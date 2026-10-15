@@ -1,4 +1,4 @@
-"""Qdrant 向量数据库适配器"""
+"""Qdrant 向量数据库适配器 - 支持远程模式和本地内存模式"""
 
 import time
 import numpy as np
@@ -18,23 +18,32 @@ import config
 
 
 class QdrantAdapter(BaseAdapter):
-    """Qdrant 适配器"""
+    """Qdrant 适配器 - 支持远程和本地内存模式"""
 
-    def __init__(self, collection_name: str, dim: int):
+    def __init__(self, collection_name: str, dim: int, local_mode: bool = False):
         super().__init__(collection_name, dim)
+        self.local_mode = local_mode
         self.client = None
 
     @property
     def db_name(self) -> str:
+        if self.local_mode:
+            return "Qdrant-Local"
         return "Qdrant"
 
     def connect(self) -> None:
-        print(f"  [Qdrant] 连接到 {config.QDRANT_CONFIG['host']}:{config.QDRANT_CONFIG['port']}")
-        self.client = QdrantClient(
-            host=config.QDRANT_CONFIG["host"],
-            port=config.QDRANT_CONFIG["port"],
-            prefer_grpc=True,
-        )
+        if self.local_mode:
+            # 本地内存模式：数据仅存于内存，程序结束即释放
+            print(f"  [Qdrant-Local] 本地内存模式")
+            self.client = QdrantClient(":memory:")
+        else:
+            # 远程模式
+            print(f"  [Qdrant] 连接到 {config.QDRANT_CONFIG['host']}:{config.QDRANT_CONFIG['port']}")
+            self.client = QdrantClient(
+                host=config.QDRANT_CONFIG["host"],
+                port=config.QDRANT_CONFIG["port"],
+                prefer_grpc=True,
+            )
 
     def create_collection(self) -> None:
         # 如果已存在则先删除
@@ -83,7 +92,6 @@ class QdrantAdapter(BaseAdapter):
 
     def build_index(self) -> float:
         # Qdrant 的 HNSW 索引在数据插入时自动构建
-        # 等待所有操作完成
         start = time.perf_counter()
         self.client.flush(collection_name=self.collection_name)
         elapsed = time.perf_counter() - start
@@ -110,4 +118,5 @@ class QdrantAdapter(BaseAdapter):
     def close(self) -> None:
         if self.client:
             self.client.close()
+        # 本地内存模式：数据随进程结束自动释放
         print(f"  [Qdrant] 连接已关闭")
