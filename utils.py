@@ -113,11 +113,11 @@ def brute_force_knn(
     Returns:
         shape (num_queries, k) 的最近邻索引数组
     """
-    # 使用 L2 距离
-    # (a-b)^2 = a^2 - 2ab + b^2
+    # 使用 L2 距离的平方: ||a-b||^2 = ||a||^2 - 2*a.b + ||b||^2
     a_sq = np.sum(base_vectors ** 2, axis=1, keepdims=True)   # (n, 1)
-    b_sq = np.sum(query_vectors ** 2, axis=1, keepdims=True)  # (q, 1)
-    dist = a_sq.T - 2 * base_vectors @ query_vectors.T + b_sq  # (n, q)
+    b_sq = np.sum(query_vectors ** 2, axis=1)                 # (q,)
+    cross = base_vectors @ query_vectors.T                    # (n, q)
+    dist = a_sq - 2 * cross + b_sq                            # (n, q)
 
     # 取每列最小的 k 个索引
     indices = np.argpartition(dist, k, axis=0)[:k, :]  # (k, q)

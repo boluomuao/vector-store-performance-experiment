@@ -92,22 +92,23 @@ class QdrantAdapter(BaseAdapter):
 
     def build_index(self) -> float:
         # Qdrant 的 HNSW 索引在数据插入时自动构建
+        # 本地模式下无需额外操作
         start = time.perf_counter()
-        self.client.flush(collection_name=self.collection_name)
+        # 等待所有插入操作完成
+        import time as time_module
+        time_module.sleep(0.1)  # 短暂等待确保数据持久化
         elapsed = time.perf_counter() - start
         print(f"  [Qdrant] 索引确认完成 ({elapsed:.2f}s)")
         return elapsed
 
     def search(self, query: np.ndarray, top_k: int) -> List[int]:
-        results = self.client.search(
+        # 使用 query_points API（兼容本地和远程模式）
+        results = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=query.tolist(),
+            query=query.tolist(),
             limit=top_k,
-            search_params=SearchParams(
-                hnsw_ef=config.QDRANT_SEARCH_PARAMS["hnsw_ef"],
-            ),
         )
-        return [hit.id for hit in results]
+        return [point.id for point in results.points]
 
     def count(self) -> int:
         if self.client:

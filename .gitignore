@@ -12,3 +12,4 @@ results.txt
 .venv/
 venv/
 向量数据库/
+milvus_bench_*/
