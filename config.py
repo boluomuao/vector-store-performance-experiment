@@ -9,7 +9,6 @@
 │  ├──────────────┼────────────┼──────────┼─────────────────────┤ │
 │  │ small_normal │ 10,000     │ 128      │ 小规模/低维          │ │
 │  │ small_high   │ 10,000     │ 768      │ 小规模/BERT级别      │ │
-│  │ medium       │ 100,000    │ 1536     │ 中规模/OpenAI嵌入级别│ │
 │  │ large        │ 1,000,000  │ 4096     │ 大规模/匹配真实数据  │ │
 │  │ real_cluster │ 50,000     │ 4096     │ 模拟真实聚类分布     │ │
 │  └──────────────┴────────────┴──────────┴─────────────────────┘ │
@@ -77,12 +76,6 @@ DATASETS = {
         "distribution": "normal",
         "description": "小规模-高维(BERT级别)",
     },
-    "medium": {
-        "num_vectors": 100_000,
-        "dim": 1536,
-        "distribution": "normal",
-        "description": "中规模-中高维(OpenAI嵌入级别)",
-    },
     "large": {
         "num_vectors": 1_000_000,
         "dim": 4096,
@@ -98,7 +91,7 @@ DATASETS = {
 }
 
 # 默认使用的数据集（可被命令行参数覆盖）
-DEFAULT_DATASETS = ["small_normal", "small_high", "medium", "real_cluster"]
+DEFAULT_DATASETS = ["small_normal", "small_high", "real_cluster"]
 
 # ============================================================
 # 搜索参数
